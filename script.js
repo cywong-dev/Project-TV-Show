@@ -141,26 +141,19 @@ function makePageForEpisodes(episodeList) {
   episodeSelect.addEventListener("change", function () {
     const selectedEpisodeId = episodeSelect.value;
 
+    searchInput.value = "";
+
     if (!selectedEpisodeId) {
+      displayEpisodes(allEpisodes);
       return;
     }
 
-    // Clear the search
-    searchInput.value = "";
-
-    // Show all episodes
-    displayEpisodes(allEpisodes);
-
-    // Find the selected episode
-    const selectedEpisode = document.getElementById(
-      `episode-${selectedEpisodeId}`
+    const selectedEpisode = allEpisodes.find(
+      (episode) => String(episode.id) === String(selectedEpisodeId)
     );
 
     if (selectedEpisode) {
-      selectedEpisode.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      });
+      displayEpisodes([selectedEpisode]);
     }
   });
 
