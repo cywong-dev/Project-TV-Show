@@ -1,9 +1,54 @@
 // You can edit ALL of the code here
 let allEpisodes = [];
 
-function setup() {
-  allEpisodes = getAllEpisodes();
-  makePageForEpisodes(allEpisodes);
+const EPISODES_URL = "https://api.tvmaze.com/shows/82/episodes";
+
+// Helper function to display messages to the user in the UI
+function displayStatusMessage(message, isError = false) {
+  const statusContainer = document.getElementById("status-message") || createStatusContainer();
+  statusContainer.textContent = message;
+  statusContainer.style.color = isError ? "red" : "black";
+}
+
+function createStatusContainer() {
+  const container = document.createElement("div");
+  container.id = "status-message";
+  container.style.padding = "1rem";
+  container.style.fontSize = "1.2rem";
+  container.style.textAlign = "center";
+  
+  // Prepend to body or main container
+  document.body.prepend(container);
+  return container;
+}
+
+// Fetch episodes ONCE on page load
+async function setup() {
+  displayStatusMessage("Loading episodes, please wait...");
+
+  try {
+    const response = await fetch(EPISODES_URL);
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+
+    // Store episodes in state array
+    allEpisodes = await response.json();
+
+    // Clear the loading message
+    displayStatusMessage("");
+
+    // Initialize your application UI with the loaded data
+    makePageForEpisodes(allEpisodes);
+
+  } catch (error) {
+    // Notify the user directly in the DOM (not just console.error)
+    displayStatusMessage(
+      "Failed to load episodes. Please check your internet connection and try refreshing the page.",
+      true
+    );
+  }
 }
 
 function makePageForEpisodes(episodeList) {
