@@ -1,11 +1,15 @@
 // You can edit ALL of the code here
+let allShows = [];
 let allEpisodes = [];
 
-const EPISODES_URL = "https://api.tvmaze.com/shows/82/episodes";
+const SHOWS_URL = "https://api.tvmaze.com/shows";
+
+const episodeCache = {};
 
 // Helper function to display messages to the user in the UI
 function displayStatusMessage(message, isError = false) {
-  const statusContainer = document.getElementById("status-message") || createStatusContainer();
+  const statusContainer =
+    document.getElementById("status-message") || createStatusContainer();
   statusContainer.textContent = message;
   statusContainer.style.color = isError ? "red" : "black";
 }
@@ -16,7 +20,7 @@ function createStatusContainer() {
   container.style.padding = "1rem";
   container.style.fontSize = "1.2rem";
   container.style.textAlign = "center";
-  
+
   // Prepend to body or main container
   document.body.prepend(container);
   return container;
@@ -27,21 +31,27 @@ async function setup() {
   displayStatusMessage("Loading episodes, please wait...");
 
   try {
-    const response = await fetch(EPISODES_URL);
+    const response = await fetch(SHOWS_URL);
 
     if (!response.ok) {
       throw new Error(`HTTP error! Status: ${response.status}`);
     }
 
     // Store episodes in state array
-    allEpisodes = await response.json();
+    allShows = await response.json();
+
+    // Sort shows alphabetically, case-insensitive
+    allShows.sort((a, b) =>
+      a.name.localeCompare(b.name, undefined, {
+        sensitivity: "base",
+      })
+    );
 
     // Clear the loading message
     displayStatusMessage("");
 
     // Initialize your application UI with the loaded data
-    makePageForEpisodes(allEpisodes);
-
+    makePageForShows();
   } catch (error) {
     // Notify the user directly in the DOM (not just console.error)
     displayStatusMessage(
@@ -51,11 +61,115 @@ async function setup() {
   }
 }
 
-function makePageForEpisodes(episodeList) {
+function makePageForShows() {
   const rootElem = document.getElementById("root");
-
-  // Clear any existing content in rootElem
   rootElem.innerHTML = "";
+
+  // Show selector
+  const showContainer = document.createElement("div");
+  showContainer.className = "show-selector-container";
+
+  const showLabel = document.createElement("label");
+  showLabel.htmlFor = "show-select";
+  showLabel.textContent = "Choose a show: ";
+
+  const showSelect = document.createElement("select");
+  showSelect.id = "show-select";
+
+  const defaultOption = document.createElement("option");
+  defaultOption.value = "";
+  defaultOption.textContent = "Select a show...";
+  showSelect.appendChild(defaultOption);
+
+  // Add sorted shows to dropdown
+  allShows.forEach((show) => {
+    const option = document.createElement("option");
+
+    option.value = show.id;
+    option.textContent = show.name;
+
+    showSelect.appendChild(option);
+  });
+
+  showContainer.appendChild(showLabel);
+  showContainer.appendChild(showSelect);
+
+  rootElem.appendChild(showContainer);
+
+  // Episode area
+  const episodeArea = document.createElement("div");
+  episodeArea.id = "episode-area";
+
+  rootElem.appendChild(episodeArea);
+
+  // When user selects a show
+  showSelect.addEventListener("change", async function () {
+    const selectedShowId = showSelect.value;
+
+    if (!selectedShowId) {
+      episodeArea.innerHTML = "";
+      allEpisodes = [];
+      return;
+    }
+
+    const selectedShow = allShows.find(
+      (show) => String(show.id) === String(selectedShowId)
+    );
+
+    if (selectedShow) {
+      await loadEpisodesForShow(selectedShow, episodeArea);
+    }
+  });
+}
+
+async function loadEpisodesForShow(show, episodeArea) {
+  const showId = show.id;
+
+  // If we've already fetched this show's episodes,
+  // don't make another request.
+  if (episodeCache[showId]) {
+    allEpisodes = episodeCache[showId];
+
+    makePageForEpisodes(allEpisodes, show, episodeArea);
+
+    return;
+  }
+
+  displayStatusMessage(`Loading episodes for ${show.name}, please wait...`);
+
+  try {
+    const episodesUrl = `https://api.tvmaze.com/shows/${showId}/episodes`;
+
+    const response = await fetch(episodesUrl);
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+
+    const episodes = await response.json();
+
+    // Store episodes in cache
+    episodeCache[showId] = episodes;
+
+    allEpisodes = episodes;
+
+    displayStatusMessage("");
+
+    makePageForEpisodes(allEpisodes, show, episodeArea);
+  } catch (error) {
+    console.error(error);
+
+    displayStatusMessage(`Failed to load episodes for ${show.name}.`, true);
+  }
+}
+
+function makePageForEpisodes(episodeList, show, episodeArea) {
+  episodeArea.innerHTML = "";
+
+  const showTitle = document.createElement("h1");
+  showTitle.textContent = show.name;
+
+  episodeArea.appendChild(showTitle);
 
   // Create the search area
   const searchContainer = document.createElement("div");
@@ -78,7 +192,7 @@ function makePageForEpisodes(episodeList) {
   searchContainer.appendChild(searchInput);
   searchContainer.appendChild(resultCount);
 
-  rootElem.appendChild(searchContainer);
+  episodeArea.appendChild(searchContainer);
 
   // Create the episode selector
   const episodeSelect = document.createElement("select");
@@ -103,7 +217,7 @@ function makePageForEpisodes(episodeList) {
     episodeSelect.appendChild(option);
   });
 
-  rootElem.appendChild(episodeSelect);
+  episodeArea.appendChild(episodeSelect);
 
   // Create a container for the episode cards
   const container = document.createElement("div");
@@ -161,7 +275,7 @@ function makePageForEpisodes(episodeList) {
   }
 
   // Add the episode container to the page
-  rootElem.appendChild(container);
+  episodeArea.appendChild(container);
 
   // Display all episodes initially
   displayEpisodes(episodeList);
@@ -206,7 +320,7 @@ function makePageForEpisodes(episodeList) {
   const footer = document.createElement("footer");
   footer.className = "tvmaze-attribution";
   footer.innerHTML = `Data originally provided by <a href="https://www.tvmaze.com/" target="_blank" rel="noopener noreferrer">TVMaze.com</a>`;
-  rootElem.appendChild(footer);
+  episodeArea.appendChild(footer);
 }
 
 window.onload = setup;
